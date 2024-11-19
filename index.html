@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录界面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            width: 320px;
+        }
+        .login-container h3 {
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #ff5252;
+        }
+        .code-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .code-container input {
+            flex: 1;
+        }
+        .get-code-btn {
+            padding: 10px;
+            border: none;
+            background: #ff5252;
+            color: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .get-code-btn:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            background: #ff5252;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .submit-btn:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+<div class="login-container">
+    <h3>请输入您的手机号，登录或注册您的账号</h3>
+    <div class="form-group">
+        <input type="text" id="phone" placeholder="请输入手机号" maxlength="11">
+    </div>
+    <div class="form-group code-container">
+        <input type="text" id="code" placeholder="请输入验证码" maxlength="6">
+        <button id="getCodeBtn" class="get-code-btn">获取验证码</button>
+    </div>
+    <button id="submitBtn" class="submit-btn" disabled>开始</button>
+</div>
+
+<script type="module">
+
+    import request from "./request.js";
+
+    const phoneInput = document.getElementById('phone');
+    const codeInput = document.getElementById('code');
+    const getCodeBtn = document.getElementById('getCodeBtn');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // 模拟验证码倒计时
+    let countdown = 60;
+    const startCountdown = () => {
+        getCodeBtn.disabled = true;
+        const interval = setInterval(() => {
+            if (countdown === 0) {
+                clearInterval(interval);
+                getCodeBtn.textContent = '获取验证码';
+                getCodeBtn.disabled = false;
+                countdown = 60;
+            } else {
+                getCodeBtn.textContent = `${countdown--}s后重试`;
+            }
+        }, 1000);
+    };
+
+    // 手机号输入检测
+    phoneInput.addEventListener('input', () => {
+        const isPhoneValid = /^[1][3-9]\d{9}$/.test(phoneInput.value);
+        getCodeBtn.disabled = !isPhoneValid;
+    });
+
+    // 验证码输入检测
+    codeInput.addEventListener('input', () => {
+        const isFormValid = codeInput.value.length === 6 && /^[1][3-9]\d{9}$/.test(phoneInput.value);
+        submitBtn.disabled = !isFormValid;
+    });
+
+    // 获取验证码按钮点击事件
+    getCodeBtn.addEventListener('click', () => {
+        if (!getCodeBtn.disabled) {
+            alert('验证码已发送，请查收！');
+            startCountdown();
+        }
+    });
+
+    // 提交按钮点击事件
+    submitBtn.addEventListener('click', async () => {
+        const phone = phoneInput.value.trim();
+        const code = codeInput.value.trim();
+
+        if (!phone || !code) {
+            alert("手机号或验证码不能为空！");
+            return;
+        }
+
+        try {
+            const response = await request("/authLogin", "POST", {
+                phone,
+                code,
+            });
+
+            if (response.isok) {
+                // 保存 token 和用户信息
+                const { token, userInfoResponse } = response.data;
+                localStorage.setItem("token", token); // 保存 token
+                localStorage.setItem("userInfo", JSON.stringify(userInfoResponse)); // 保存用户信息
+
+                alert("登录成功！");
+                console.log("用户信息：", userInfoResponse);
+
+                // 跳转到主页或其他页面
+                window.location.href = "/home.html";
+            } else {
+                alert(`登录失败: ${response.message}`);
+            }
+        } catch (error) {
+            alert("登录失败，请稍后重试！");
+            console.error("登录失败：", error);
+        }
+    });
+</script>
+</body>
+</html>
