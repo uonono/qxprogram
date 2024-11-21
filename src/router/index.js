@@ -1,7 +1,8 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router';
-import Home from '../components/Home.vue'; // 主页面组件
-import Login from '../components/Login.vue'; // 登录页面组件
+import Home from '../components/Home.vue';
+import Login from '../components/Login.vue';
+import OrderDetail from '../components/OrderDetail.vue';
+import OrderAccepted from "../components/OrderAccepted.vue"; // 导入新组件
 
 const routes = [
     {
@@ -13,6 +14,16 @@ const routes = [
         path: '/login',
         name: 'Login',
         component: Login,
+    },
+    {
+        path: "/order-detail",
+        name: "OrderDetail",
+        component: OrderDetail, // 添加新路由
+    },
+    {
+        path: "/order-accepted",
+        name: "OrderAccepted",
+        component: OrderAccepted, // 新的接单成功页面
     },
 ];
 

@@ -1,14 +1,24 @@
 <template>
   <div class="home">
     <!-- Header -->
+    <!--  https://modao.cc/community/details/mtlrreiuy7vdpgmc  -->
     <div class="header">
-      <div class="tab active">接单大厅</div>
-      <div class="tab">指派列表</div>
-      <div class="tab">进行中</div>
+      <div
+          :class="{ tab: true, active: activeTab === 'hall' }"
+          @click="changeTab('hall')"
+      >
+        接单大厅
+      </div>
+      <div
+          :class="{ tab: true, active: activeTab === 'inProgress' }"
+          @click="changeTab('inProgress')"
+      >
+        进行中
+      </div>
     </div>
 
     <!-- Filters -->
-    <div class="filters">
+    <div v-if="activeTab === 'hall'" class="filters">
       <div class="filter">全部</div>
       <div class="filter">离我最近</div>
       <div class="filter">时间</div>
@@ -28,51 +38,51 @@
           <p>维修项目: {{ order.content }}</p>
           <p>联系人: {{ order.contactName }} ({{ order.contactPhone }})</p>
           <p>地址: {{ order.addressAreaName }}</p>
-          <p class="distance">距离当前：{{ order.distance || "未知" }}</p>
+          <p class="distance" v-if="activeTab === 'hall'">
+            距离当前：{{ order.distance || "未知" }}
+          </p>
         </div>
-        <button class="order-btn" @click="acceptOrder(order.id)">接单</button>
-      </div>
-
-      <!-- Pagination -->
-      <div class="pagination">
-        <span @click="changePage(currentPage - 1)" :class="{ disabled: currentPage === 1 }">&lt;</span>
-        <span
-            v-for="page in totalPages"
-            :key="page"
-            @click="changePage(page)"
-            :class="{ active: currentPage === page }"
+        <button
+            v-if="activeTab === 'hall'"
+            class="order-btn"
+            @click="acceptOrder(order)"
         >
-          {{ page }}
-        </span>
-        <span @click="changePage(currentPage + 1)" :class="{ disabled: currentPage === totalPages }">&gt;</span>
+          接单
+        </button>
       </div>
     </div>
 
-    <!-- Footer -->
-    <div class="footer">
-      <div class="tab active">
-        <img src="https://via.placeholder.com/20" alt="接单大厅" />
-        接单大厅
-      </div>
-      <div class="tab">
-        <img src="https://via.placeholder.com/20" alt="消息" />
-        消息
-      </div>
-      <div class="tab">
-        <img src="https://via.placeholder.com/20" alt="我的" />
-        我的
-      </div>
+    <!-- Pagination -->
+    <div v-if="activeTab === 'hall'" class="pagination">
+      <span
+          @click="changePage(currentPage - 1)"
+          :class="{ disabled: currentPage === 1 }"
+      >&lt;</span
+      >
+      <span
+          v-for="page in totalPages"
+          :key="page"
+          @click="changePage(page)"
+          :class="{ active: currentPage === page }"
+      >
+        {{ page }}
+      </span>
+      <span
+          @click="changePage(currentPage + 1)"
+          :class="{ disabled: currentPage === totalPages }"
+      >&gt;</span
+      >
     </div>
   </div>
 </template>
-
 <script>
-import axios from 'axios';
+import axios from "axios";
 
 export default {
   data() {
     return {
-      orders: [], // 订单数据
+      activeTab: "hall", // 当前活动的标签，默认为接单大厅
+      orders: [], // 工单数据
       currentPage: 1, // 当前页码
       totalPages: 1, // 总页数
       userLocation: null, // 用户当前位置
@@ -85,7 +95,6 @@ export default {
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
               (position) => {
-                console.log(position.coords.latitude,position.coords.longitude)
                 resolve({
                   latitude: position.coords.latitude,
                   longitude: position.coords.longitude,
@@ -104,6 +113,58 @@ export default {
       });
     },
 
+    // 获取订单数据
+    async fetchOrders(tab, pageNumber = 1) {
+      const url =
+          tab === "hall"
+              ? `https://127.0.0.1:5000/qx/faultOrder/findByPage?pageNumber=${pageNumber}&pageSize=10`
+              : "https://127.0.0.1:5000/qx/faultOrder/inProgress";
+
+      try {
+        const token = localStorage.getItem("token");
+
+        const response = await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.data.isok) {
+          this.orders = response.data.data;
+          if (tab === "hall") {
+            this.totalPages = Math.ceil(response.data.total / 10) || 1;
+
+            // 如果用户位置信息已获取，计算距离
+            if (this.userLocation) {
+              this.orders.forEach((order) => {
+                if (order.latitude && order.longitude) {
+                  order.distance = `${this.calculateDistance(
+                      this.userLocation.latitude,
+                      this.userLocation.longitude,
+                      order.latitude,
+                      order.longitude
+                  ).toFixed(2)} km`;
+                } else {
+                  order.distance = "未知";
+                }
+              });
+            }
+          }
+        } else {
+          alert(`获取订单失败: ${response.data.message}`);
+        }
+      } catch (error) {
+        console.error("获取订单数据失败:", error);
+        alert("无法加载订单数据，请稍后重试。");
+      }
+    },
+
+    // 切换标签
+    changeTab(tab) {
+      this.activeTab = tab;
+      this.fetchOrders(tab); // 根据当前选中的标签加载数据
+    },
+
     // 计算两点之间的直线距离
     calculateDistance(lat1, lon1, lat2, lon2) {
       const toRad = (value) => (value * Math.PI) / 180;
@@ -120,80 +181,19 @@ export default {
       return R * c; // 返回距离，单位为千米
     },
 
-    // 获取订单数据
-    async fetchOrders(pageNumber = 1) {
-      try {
-        const token = localStorage.getItem("token");
-
-        const response = await axios.get(
-            `https://127.0.0.1:8769/faultOrder/findByPage?pageNumber=${pageNumber}&pageSize=10`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-        );
-
-        if (response.data.isok) {
-          const orders = response.data.data;
-
-          // 如果用户位置信息已获取，计算距离
-          if (this.userLocation) {
-            orders.forEach((order) => {
-              if (order.latitude && order.longitude) {
-                order.distance = `${this.calculateDistance(
-                    this.userLocation.latitude,
-                    this.userLocation.longitude,
-                    order.latitude,
-                    order.longitude
-                ).toFixed(2)} km`;
-              } else {
-                order.distance = "未知";
-              }
-            });
-          }
-
-          this.orders = orders;
-          this.totalPages = Math.ceil(response.data.total / 10) || 1;
-        } else {
-          alert(`获取订单失败: ${response.data.message}`);
-        }
-      } catch (error) {
-        console.error("获取订单数据失败:", error);
-        alert("无法加载订单数据，请稍后重试。");
-      }
-    },
-
     // 接单操作
-    async acceptOrder(orderId) {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.get(
-            `https://127.0.0.1:8769/faultOrder/accept/${orderId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-        );
-
-        if (response.data.isok) {
-          alert(`接单成功！订单 ID：${orderId}`);
-          this.fetchOrders(); // 重新加载订单列表
-        } else {
-          alert(`接单失败：${response.data.message}`);
-        }
-      } catch (error) {
-        console.error("接单失败:", error);
-        alert("接单失败，请稍后重试！");
-      }
+    acceptOrder(order) {
+      this.$router.push({
+        name: "OrderDetail",
+        query: { order: JSON.stringify(order) },
+      });
     },
 
-    // 切换页面
+    // 切换页码
     changePage(page) {
       if (page > 0 && page <= this.totalPages) {
         this.currentPage = page;
-        this.fetchOrders(page); // 加载对应页面数据
+        this.fetchOrders("hall", page); // 加载大厅数据
       }
     },
   },
@@ -201,8 +201,8 @@ export default {
     try {
       // 获取用户位置
       this.userLocation = await this.getUserLocation();
-      // 加载订单数据
-      this.fetchOrders();
+      // 加载默认标签（接单大厅）数据
+      this.fetchOrders("hall");
     } catch (error) {
       console.error("无法加载用户位置或订单数据:", error);
     }
